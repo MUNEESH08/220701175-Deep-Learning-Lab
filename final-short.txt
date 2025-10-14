@@ -1,0 +1,48 @@
+import numpy as np, tensorflow as tf, matplotlib.pyplot as plt
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam
+from sklearn.datasets import load_iris
+
+# Data
+x_train = load_iris().data
+
+# Models
+def gen(): 
+    m = Sequential([Dense(128, input_shape=(100,), activation='relu'),
+                    Dense(4, activation='linear')])
+    return m
+
+def disc(): 
+    m = Sequential([Dense(128, input_shape=(4,), activation='relu'),
+                    Dense(1, activation='sigmoid')])
+    return m
+
+G, D = gen(), disc()
+D.compile(loss='binary_crossentropy', optimizer=Adam(0.0002, 0.5), metrics=['acc'])
+D.trainable = False
+GAN = Sequential([G, D])
+GAN.compile(loss='binary_crossentropy', optimizer=Adam(0.0002, 0.5))
+
+# Train
+for e in range(200):
+    idx = np.random.randint(0, x_train.shape[0], 16)
+    real, noise = x_train[idx], np.random.normal(0, 1, (16, 100))
+    fake = G.predict(noise, verbose=0)
+    r_lbl, f_lbl = np.ones((16,1)), np.zeros((16,1))
+    d_loss_r = D.train_on_batch(real, r_lbl)
+    d_loss_f = D.train_on_batch(fake, f_lbl)
+    g_loss = GAN.train_on_batch(noise, r_lbl)
+    print(f"Epoch {e}/200 | D Loss: {(d_loss_r[0]+d_loss_f[0])/2:.4f} | G Loss: {g_loss:.4f}")
+
+# Generate & Plot
+syn = G.predict(np.random.normal(0,1,(150,100)), verbose=0)
+plt.figure(figsize=(12,8))
+k=1
+for i in range(4):
+    for j in range(i+1,4):
+        plt.subplot(2,3,k)
+        plt.scatter(x_train[:,i], x_train[:,j], c='b', label='Real', s=30)
+        plt.scatter(syn[:,i], syn[:,j], c='r', label='Synthetic', marker='x', s=30)
+        plt.xlabel(f'F{i+1}'); plt.ylabel(f'F{j+1}'); plt.legend(); k+=1
+plt.tight_layout(); plt.show()
